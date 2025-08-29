@@ -21,19 +21,6 @@ Set your RPC URL in your environment:
 export PONDER_RPC_URL_1="http://your-private-chain-rpc-url:8545"
 ```
 
-### Chain Configuration
-
-The indexer is configured for chain ID `6666`. Update `ponder.config.ts` if your chain uses a different ID:
-
-```typescript
-chains: {
-  mainnet: {
-    id: 6666, // Change this to your chain ID
-    rpc: process.env.PONDER_RPC_URL_1,
-  },
-}
-```
-
 ## Installation & Setup
 
 1. Install dependencies:
@@ -41,8 +28,9 @@ chains: {
 npm install
 ```
 
-2. Set your RPC URL:
+2. Set your CHAIN ID and RPC URL :
 ```bash
+export PONDER_CHAIN_ID_1="1234"
 export PONDER_RPC_URL_1="http://your-chain-rpc:8545"
 ```
 
