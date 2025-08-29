@@ -6,18 +6,23 @@ ponder.on("AllTransactions:block", async ({ event, context }) => {
   const { block } = event;
 
   // First, insert the block data
-  await context.db
-    .insert(schema.blocks)
-    .values({
-      hash: block.hash,
-      number: block.number,
-      timestamp: block.timestamp,
-      parentHash: block.parentHash,
-      gasUsed: block.gasUsed,
-      gasLimit: block.gasLimit,
-      transactionCount: 0, // Will be calculated from actual transactions
-    })
-    .onConflictDoNothing();
+  try {
+    await context.db
+      .insert(schema.blocks)
+      .values({
+        hash: block.hash,
+        number: block.number,
+        timestamp: block.timestamp,
+        parentHash: block.parentHash,
+        gasUsed: block.gasUsed,
+        gasLimit: block.gasLimit,
+        transactionCount: 0, // Will be calculated from actual transactions
+      })
+      .onConflictDoNothing();
+  } catch (blockError) {
+    console.error(`Failed to insert block ${block.number}:`, blockError instanceof Error ? blockError.message : String(blockError));
+    return; // Skip processing transactions if block insertion fails
+  }
 
   // Fetch the full block with transactions using the client
   const fullBlock = await context.client.getBlock({
@@ -33,6 +38,12 @@ ponder.on("AllTransactions:block", async ({ event, context }) => {
       // Skip if transaction is just a hash (shouldn't happen with includeTransactions: true)
       if (typeof transaction === 'string') continue;
 
+      // Validate transaction object has required properties
+      if (!transaction || !transaction.hash) {
+        console.warn(`Skipping invalid transaction in block ${block.number}`);
+        continue;
+      }
+
       transactionCount++;
 
       // Get transaction receipt for gas used and status
@@ -42,38 +53,46 @@ ponder.on("AllTransactions:block", async ({ event, context }) => {
         const receipt = await context.client.getTransactionReceipt({
           hash: transaction.hash,
         });
-        gasUsed = receipt.gasUsed;
+        gasUsed = receipt.gasUsed || 0n;
         status = receipt.status === 'success' ? 1 : 0;
       } catch (error) {
-        console.warn(`Could not get receipt for transaction ${transaction.hash}:`, error);
+        console.warn(`Could not get receipt for transaction ${transaction.hash}:`, error instanceof Error ? error.message : String(error));
       }
 
-      await context.db
-        .insert(schema.transactions)
-        .values({
-          hash: transaction.hash,
-          blockNumber: block.number,
-          blockHash: block.hash,
-          transactionIndex: transaction.transactionIndex,
-          from: transaction.from,
-          to: transaction.to,
-          value: transaction.value,
-          gasPrice: transaction.gasPrice || 0n,
-          gasUsed: gasUsed,
-          gasLimit: transaction.gas,
-          input: transaction.input,
-          nonce: transaction.nonce,
-          timestamp: block.timestamp,
-          status: status,
-        })
-        .onConflictDoNothing();
+      try {
+        await context.db
+          .insert(schema.transactions)
+          .values({
+            hash: transaction.hash,
+            blockNumber: block.number,
+            blockHash: block.hash,
+            transactionIndex: transaction.transactionIndex || 0,
+            from: transaction.from,
+            to: transaction.to || null,
+            value: transaction.value || 0n,
+            gasPrice: transaction.gasPrice || 0n,
+            gasUsed: gasUsed,
+            gasLimit: transaction.gas || 0n,
+            input: transaction.input || '0x',
+            nonce: transaction.nonce || 0,
+            timestamp: block.timestamp,
+            status: status,
+          })
+          .onConflictDoNothing();
+      } catch (dbError) {
+        console.error(`Failed to insert transaction ${transaction.hash}:`, dbError instanceof Error ? dbError.message : String(dbError));
+      }
     }
   }
 
   // Update block with actual transaction count
-  await context.db
-    .update(schema.blocks, { hash: block.hash })
-    .set({ transactionCount });
+  try {
+    await context.db
+      .update(schema.blocks, { hash: block.hash })
+      .set({ transactionCount });
+  } catch (updateError) {
+    console.error(`Failed to update transaction count for block ${block.number}:`, updateError instanceof Error ? updateError.message : String(updateError));
+  }
 
   console.log(`Indexed block ${block.number} with ${transactionCount} transactions`);
 });
