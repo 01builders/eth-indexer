@@ -3,7 +3,7 @@ import { createConfig } from "ponder";
 export default createConfig({
   chains: {
     mainnet: {
-      id: 6666,
+      id: process.env.PONDER_CHAIN_ID_1,
       rpc: process.env.PONDER_RPC_URL_1,
     },
   },

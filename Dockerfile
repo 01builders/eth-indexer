@@ -30,15 +30,13 @@ COPY package.json package-lock.json ./
 # Install only production dependencies
 RUN npm ci --only=production && npm cache clean --force
 
-# Debug
-RUN ls -l /build
-
 # Copy application files from build stage
 COPY --from=build --chown=ponder:nodejs /build/src ./src
-COPY --from=build --chown=ponder:nodejs /build/generated ./generated
 COPY --from=build --chown=ponder:nodejs /build/ponder.config.ts ./ponder.config.ts
 COPY --from=build --chown=ponder:nodejs /build/ponder.schema.ts ./ponder.schema.ts
 COPY --from=build --chown=ponder:nodejs /build/ponder-env.d.ts ./ponder-env.d.ts
+
+RUN chown -R ponder:nodejs /app
 
 # Switch to non-root user
 USER ponder
