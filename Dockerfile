@@ -30,6 +30,9 @@ COPY package.json package-lock.json ./
 # Install only production dependencies
 RUN npm ci --only=production && npm cache clean --force
 
+# Debug
+RUN ls -l /build
+
 # Copy application files from build stage
 COPY --from=build --chown=ponder:nodejs /build/src ./src
 COPY --from=build --chown=ponder:nodejs /build/generated ./generated
